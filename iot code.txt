@@ -1,0 +1,135 @@
+import RPi.GPIO as GPIO
+from time import sleep
+
+import Adafruit_DHT
+import requests as req
+sensor = Adafruit_DHT.DHT22
+
+pin = 4
+
+
+GPIO.setwarnings(False)
+
+FLOW_SENSOR = 23
+
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(FLOW_SENSOR, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+GPIO.setup(3,GPIO.OUT) #motor
+GPIO.setup(21,GPIO.IN) #moisture
+GPIO.setup(16,GPIO.IN)
+GPIO.setup(20,GPIO.OUT)
+
+
+GPIO.output(3,GPIO.LOW)
+
+
+global count,flow, max_count, start_counter
+count = 0
+max_count=0
+start_counter = False
+
+def countPulse(channel):
+	global count
+	global moisture
+	global max_count
+	global start_counter
+	if start_counter:
+		#print max_count, count, start_counter
+   		if count > max_count:
+      	    		GPIO.output(3,False)
+			print "" 
+  			print ""
+			print " Net Amount Of Water Supplied Succesfully : %3f litre" % (count/45)
+			print ""
+			print " Motor Pump : OFF"
+			print ""
+			print ""
+  			print ""
+  			print " *-**-* "
+  			print ""
+			print ""
+			count = 0
+			start_counter = False
+      		count = count + 1
+
+
+
+GPIO.add_event_detect(FLOW_SENSOR, GPIO.FALLING, callback=countPulse)
+
+
+
+while True:
+
+	#if start_counter == False:
+	auto = req.get("https://slushiest-trick.000webhostapp.com/auto.txt").text
+        print " Mode : ", auto
+	#sleep(1)
+	if(auto == "on"):
+		#print 1
+		#print GPIO.input(21)
+		if(GPIO.input(21) == 1):
+			print ""
+                	GPIO.output(3, True)
+                	print "Water Not Detected"
+
+		else:
+                	GPIO.output(3,False)
+			print ""
+                	print "Water Detected"
+			#print 3
+
+		sleep(1)
+	elif(auto == "off"):
+		#print 4
+		#print start_counter
+		if start_counter == False:
+			#print 5
+                	li = int( req.get("https://slushiest-trick.000webhostapp.com/water.txt").text )
+			#print li
+			response = req.get("https://slushiest-trick.000webhostapp.com/index.php?water=0")
+			#print response
+			GPIO.output(3, False)
+			if ( response.status_code == 200) and  (li > 0):
+				print ""
+				print " Motor Pump : ON"
+				print ""
+				print " Water Supply Start .... "
+				start_counter = True
+				GPIO.output(3,True)
+				max_count = li * 45
+			sleep(1)
+
+	#print 6
+	humidity, temperature = Adafruit_DHT.read_retry(sensor, pin)
+	#print 7
+        req.get("https://slushiest-trick.000webhostapp.com?temp="+str(temperature))
+        req.get("https://slushiest-trick.000webhostapp.com?hum="+str(humidity))
+
+	prs = GPIO.input(16)
+
+	if (prs == 1):
+		print ""
+		print " Human Present"
+		print ""
+		req.get("https://slushiest-trick.000webhostapp.com/req.php?human=present")
+		GPIO.output(20, True)
+
+	else:
+		print ""
+		print " Human Absent"
+		print ""
+		req.get("https://slushiest-trick.000webhostapp.com/req.php?human=absent")
+		GPIO.output(20, False)
+
+
+
+	#print "end"
+
+
+
+
+
+
+
+
